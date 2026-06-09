@@ -1,4 +1,10 @@
-import type { AssistantProposal, AssistantRequest, Intent, LengthPreference, Tone } from "./types";
+import type {
+  AssistantProposal,
+  AssistantRequest,
+  Intent,
+  LengthPreference,
+  Tone,
+} from "./types";
 
 const toneLabels: Record<Tone, string> = {
   professional: "professional",
@@ -25,6 +31,17 @@ const intentLabels: Record<Intent, string> = {
   continue: "Continuation",
   title: "Titles",
   custom: "Custom",
+  book: "Book from outline",
+};
+
+const toneSentences: Record<Tone, string> = {
+  professional: "The prose stays clear, purposeful, and grounded in consequence.",
+  friendly: "The prose keeps a warm, readable rhythm while letting the characters feel human.",
+  academic: "The prose gives the scene a reflective structure and clear cause and effect.",
+  concise: "The prose stays lean and moves quickly from beat to beat.",
+  persuasive: "The prose emphasizes stakes, desire, and why this moment matters.",
+  warm: "The prose stays empathetic and intimate, with room for quiet emotion.",
+  bold: "The prose raises the stakes and gives the scene a sharper edge.",
 };
 
 function splitSentences(text: string): string[] {
@@ -99,7 +116,9 @@ function rewriteText(text: string, tone: Tone, length: LengthPreference): string
   }
 
   if (tone === "professional") {
-    rewritten = rewritten.replace(/\bstuff\b/gi, "material").replace(/\bthings\b/gi, "items");
+    rewritten = rewritten
+      .replace(/\bstuff\b/gi, "material")
+      .replace(/\bthings\b/gi, "items");
   }
 
   if (tone === "concise") {
@@ -107,7 +126,9 @@ function rewriteText(text: string, tone: Tone, length: LengthPreference): string
   }
 
   if (tone === "bold") {
-    rewritten = rewritten.replace(/\bmight\b/gi, "will").replace(/\bcould\b/gi, "can");
+    rewritten = rewritten
+      .replace(/\bmight\b/gi, "will")
+      .replace(/\bcould\b/gi, "can");
   }
 
   return applyLengthPreference(rewritten, length, tone);
@@ -127,7 +148,9 @@ function clarifyText(text: string): string {
       }
 
       const midpoint = Math.floor(sentence.length * 0.58);
-      return `${sentence.slice(0, midpoint).trim()}. ${sentence.slice(midpoint).trim()}`;
+      return `${sentence.slice(0, midpoint).trim()}. ${sentence
+        .slice(midpoint)
+        .trim()}`;
     })
     .join(" ");
 
@@ -151,7 +174,16 @@ function summarizeText(text: string): string {
         .filter(
           (word) =>
             word.length > 5 &&
-            !["about", "there", "their", "would", "could", "should", "because", "before"].includes(word),
+            ![
+              "about",
+              "there",
+              "their",
+              "would",
+              "could",
+              "should",
+              "because",
+              "before",
+            ].includes(word),
         ),
     ),
   ).slice(0, 5);
@@ -179,7 +211,13 @@ function createOutline(text: string): string {
     return `${index + 1}. ${cleanPoint}`;
   });
 
-  return ["Working outline", "", "1. Opening", ...points, `${points.length + 2}. Closing takeaway`].join("\n");
+  return [
+    "Working outline",
+    "",
+    "1. Opening",
+    ...points,
+    `${points.length + 2}. Closing takeaway`,
+  ].join("\n");
 }
 
 function createContinuation(text: string, tone: Tone): string {
@@ -192,13 +230,20 @@ function createContinuation(text: string, tone: Tone): string {
   }
 
   const leadIns: Record<Tone, string> = {
-    professional: "The next section should build on that point with a clear, actionable direction.",
-    friendly: "From here, the writing can stay approachable while moving the reader toward the next idea.",
-    academic: "The next section should extend the argument with evidence, context, and a clear transition.",
-    concise: "The next section should stay focused and move the reader quickly to the main takeaway.",
-    persuasive: "The next section should strengthen the case by showing why the idea matters now.",
-    warm: "The next section should keep the supportive tone while guiding the reader forward.",
-    bold: "The next section should raise the stakes and make the central point impossible to ignore.",
+    professional:
+      "The next section should build on that point with a clear, actionable direction.",
+    friendly:
+      "From here, the writing can stay approachable while moving the reader toward the next idea.",
+    academic:
+      "The next section should extend the argument with evidence, context, and a clear transition.",
+    concise:
+      "The next section should stay focused and move the reader quickly to the main takeaway.",
+    persuasive:
+      "The next section should strengthen the case by showing why the idea matters now.",
+    warm:
+      "The next section should keep the supportive tone while guiding the reader forward.",
+    bold:
+      "The next section should raise the stakes and make the central point impossible to ignore.",
   };
 
   return [
@@ -236,8 +281,174 @@ function createTitles(text: string): string {
   ].join("\n");
 }
 
+function parseOutlineChapters(text: string): string[] {
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const chapters: string[] = [];
+  let current = "";
+
+  for (const line of lines) {
+    const isChapterHeading =
+      /^(chapter|ch\.?)\s*\d+[\.: -]/i.test(line) ||
+      /^#\s*\d+[\.: -]/i.test(line) ||
+      /^\d+[\.: -]/i.test(line);
+
+    if (isChapterHeading) {
+      if (current) {
+        chapters.push(current);
+      }
+
+      current = line;
+      continue;
+    }
+
+    if (current) {
+      current = `${current} ${line}`;
+    }
+  }
+
+  if (current) {
+    chapters.push(current);
+  }
+
+  if (chapters.length >= 2) {
+    return chapters.slice(0, 60);
+  }
+
+  return splitParagraphs(text)
+    .slice(0, 30)
+    .map((paragraph, index) => `Chapter ${index + 1}: ${trimToWords(paragraph, 36)}`);
+}
+
+function extractChapterTitle(chapter: string, index: number): string {
+  const title = chapter
+    .replace(/^#\s*/, "")
+    .replace(/^(chapter|ch\.?)\s*\d+[\.: -]*/i, "")
+    .replace(/^\d+[\.: -]*/, "")
+    .trim();
+
+  return trimToWords(title || `Chapter ${index + 1}`, 14).replace(/[.!?]$/, "");
+}
+
+function extractChapterPremise(chapter: string): string {
+  const premise = chapter
+    .replace(/^#\s*/, "")
+    .replace(/^(chapter|ch\.?)\s*\d+[\.: -]*/i, "")
+    .replace(/^\d+[\.: -]*/, "")
+    .trim();
+
+  return premise || "Develop the next important scene in the story.";
+}
+
+function expandFictionIdea(
+  idea: string,
+  tone: Tone,
+  chapterNumber: number,
+  paragraphIndex: number,
+): string {
+  const beat =
+    paragraphIndex === 0
+      ? "Begin with a concrete image that places the reader inside the scene."
+      : paragraphIndex % 4 === 0
+        ? "Let the scene turn, revealing a complication that changes what the character thought they knew."
+        : paragraphIndex % 3 === 0
+          ? "Use a line of dialogue or a quiet action to reveal character instead of explaining it directly."
+          : "Carry the pressure forward with a clear cause-and-effect movement.";
+
+  return `${idea} ${beat} ${toneSentences[tone]} Keep Chapter ${chapterNumber} moving toward a choice, revelation, or consequence that makes the next chapter feel necessary.`;
+}
+
+function createFictionParagraphs(
+  premise: string,
+  tone: Tone,
+  wordsPerChapter: number,
+): string[] {
+  const paragraphCount = Math.min(
+    10,
+    Math.max(4, Math.round(wordsPerChapter / 260)),
+  );
+
+  const starterIdeas = [
+    `The chapter opens with ${premise}. The first image should put the reader inside the immediate pressure of the scene.`,
+    `The protagonist reacts to that pressure in a way that reveals what they want most and what they are afraid to admit.`,
+    `A second character, memory, or obstacle pushes against that desire and forces the scene to become more specific.`,
+    `The middle of the chapter should deepen the conflict through action, dialogue, and small revealing details.`,
+  ];
+
+  const extraIdeas = [
+    `The setting should reflect the emotional state of the scene without pausing the story for description.`,
+    `A brief flashback or internal thought can clarify the stakes if it changes how the reader understands the present moment.`,
+    `The chapter should include at least one moment where the character makes a choice instead of simply reacting.`,
+    `Raise the cost of failure so the reader understands why this chapter matters to the larger book.`,
+    `End the scene with a turn: new information, a betrayal, a promise, a loss, or a decision that cannot be undone.`,
+    `Let the final image echo the opening image so the chapter feels shaped rather than merely summarized.`,
+  ];
+
+  return [...starterIdeas, ...extraIdeas, ...starterIdeas]
+    .slice(0, paragraphCount)
+    .map((idea, index) => expandFictionIdea(idea, tone, paragraphCount, index));
+}
+
+function generateChapterDraft(
+  chapter: string,
+  index: number,
+  wordsPerChapter: number,
+  tone: Tone,
+): string {
+  const title = extractChapterTitle(chapter, index);
+  const premise = extractChapterPremise(chapter);
+  const paragraphs = createFictionParagraphs(premise, tone, wordsPerChapter);
+
+  return [
+    `Chapter ${index}: ${title}`,
+    "",
+    ...paragraphs,
+  ].join("\n\n");
+}
+
+function generateBookFromOutline(
+  sourceText: string,
+  tone: Tone,
+  targetWordCount?: number,
+): string {
+  if (!sourceText.trim()) {
+    return "Paste or upload a chapter-by-chapter outline before generating a book draft.";
+  }
+
+  const chapters = parseOutlineChapters(sourceText);
+  const target = Math.max(1000, targetWordCount || 25000);
+  const wordsPerChapter = Math.max(300, Math.round(target / Math.max(chapters.length, 1)));
+
+  const header = [
+    "Full fiction book draft",
+    "",
+    `Target word count: ${target.toLocaleString()} words`,
+    `Chapters detected: ${chapters.length}`,
+    `Tone: ${toneLabels[tone]}`,
+    "",
+    "This is a complete chapter-by-chapter draft generated from your outline. Review it, edit the voice, and export when ready.",
+    "",
+  ].join("\n");
+
+  const body = chapters
+    .map((chapter, index) =>
+      generateChapterDraft(chapter, index + 1, wordsPerChapter, tone),
+    )
+    .join("\n\n");
+
+  return `${header}${body}`;
+}
+
 function handleCustomPrompt(request: AssistantRequest, sourceText: string): string {
   const prompt = request.customPrompt.toLowerCase();
+
+  if (prompt.includes("book") || prompt.includes("chapter")) {
+    return generateBookFromOutline(sourceText, request.tone, request.targetWordCount);
+  }
 
   if (prompt.includes("outline")) {
     return createOutline(sourceText);
@@ -266,16 +477,34 @@ function handleCustomPrompt(request: AssistantRequest, sourceText: string): stri
 
 export function generateAssistantProposal(request: AssistantRequest): AssistantProposal {
   const sourceText =
-    request.selectedText ||
-    request.documentText ||
-    (request.useBaseline ? request.baselineText : "") ||
-    "Start writing to give the assistant something to work with.";
+    request.intent === "book"
+      ? request.selectedText ||
+        request.documentText ||
+        (request.useBaseline ? request.baselineText : "") ||
+        ""
+      : request.selectedText ||
+        request.documentText ||
+        (request.useBaseline ? request.baselineText : "") ||
+        "Start writing to give the assistant something to work with.";
 
   let output = "";
   let title = "";
   let summary = "";
 
-  if (request.intent === "summarize" && request.useBaseline && request.baselineText) {
+  if (request.intent === "book") {
+    const chapterCount = parseOutlineChapters(sourceText).length;
+    output = generateBookFromOutline(
+      sourceText,
+      request.tone,
+      request.targetWordCount,
+    );
+    title = "Full book draft from outline";
+    summary = `I detected ${chapterCount} chapter beats and generated a draft shaped around your target word count.`;
+  } else if (
+    request.intent === "summarize" &&
+    request.useBaseline &&
+    request.baselineText
+  ) {
     output = summarizeText(request.baselineText);
     title = "Baseline summary";
     summary = "I summarized the uploaded work so you can reuse its themes, structure, and voice.";
@@ -325,11 +554,13 @@ export function generateAssistantProposal(request: AssistantRequest): AssistantP
     }
   }
 
-  const sourceLabel = request.selectedText
-    ? "Selected text"
-    : request.useBaseline && request.baselineText
-      ? "Document and baseline context"
-      : "Current document";
+  const sourceLabel = request.intent === "book"
+    ? "Chapter-by-chapter outline"
+    : request.selectedText
+      ? "Selected text"
+      : request.useBaseline && request.baselineText
+        ? "Document and baseline context"
+        : "Current document";
 
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -339,5 +570,6 @@ export function generateAssistantProposal(request: AssistantRequest): AssistantP
     sourceLabel,
     hasSelection: request.selectedText.trim().length > 0,
     createdAt: new Date().toISOString(),
+    ...(request.intent === "book" ? { intentLabel: intentLabels.book } : {}),
   };
 }

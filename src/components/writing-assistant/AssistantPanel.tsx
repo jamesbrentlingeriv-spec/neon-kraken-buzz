@@ -3,7 +3,14 @@ import { WandSparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -14,7 +21,13 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { excerpt } from "./editor-utils";
+import { showError } from "@/utils/toast";
 import type {
   AssistantRequest,
   Intent,
@@ -30,15 +43,56 @@ interface AssistantPanelProps {
   onCreateProposal: (request: AssistantRequest) => void;
 }
 
-const intentOptions: Array<{ value: Intent; label: string; description: string }> = [
-  { value: "rewrite", label: "Rewrite selected text", description: "Refresh wording while preserving meaning." },
-  { value: "clarify", label: "Make it clearer", description: "Simplify dense or confusing writing." },
-  { value: "tone", label: "Change tone", description: "Adapt voice for a specific audience." },
-  { value: "summarize", label: "Summarize baseline", description: "Extract themes and useful material from uploads." },
-  { value: "outline", label: "Generate outline", description: "Turn the source into a structured plan." },
-  { value: "continue", label: "Continue writing", description: "Draft the next section in the same direction." },
-  { value: "title", label: "Create titles", description: "Generate strong title options." },
-  { value: "custom", label: "Custom prompt", description: "Ask for a specific writing outcome." },
+const intentOptions: Array<{
+  value: Intent;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "rewrite",
+    label: "Rewrite selected text",
+    description: "Refresh wording while preserving meaning.",
+  },
+  {
+    value: "clarify",
+    label: "Make it clearer",
+    description: "Simplify dense or confusing writing.",
+  },
+  {
+    value: "tone",
+    label: "Change tone",
+    description: "Adapt voice for a specific audience.",
+  },
+  {
+    value: "summarize",
+    label: "Summarize baseline",
+    description: "Extract themes and useful material from uploads.",
+  },
+  {
+    value: "outline",
+    label: "Generate outline",
+    description: "Turn the source into a structured plan.",
+  },
+  {
+    value: "continue",
+    label: "Continue writing",
+    description: "Draft the next section in the same direction.",
+  },
+  {
+    value: "title",
+    label: "Create titles",
+    description: "Generate strong title options.",
+  },
+  {
+    value: "book",
+    label: "Generate full book from outline",
+    description: "Turn chapter-by-chapter notes into a full fiction draft.",
+  },
+  {
+    value: "custom",
+    label: "Custom prompt",
+    description: "Ask for a specific writing outcome.",
+  },
 ];
 
 const toneOptions: Array<{ value: Tone; label: string }> = [
@@ -67,6 +121,8 @@ const AssistantPanel = ({
   const [tone, setTone] = React.useState<Tone>("professional");
   const [length, setLength] = React.useState<LengthPreference>("same");
   const [customPrompt, setCustomPrompt] = React.useState("");
+  const [outlinePrompt, setOutlinePrompt] = React.useState("");
+  const [targetWordCount, setTargetWordCount] = React.useState("25000");
   const [useBaseline, setUseBaseline] = React.useState(false);
 
   React.useEffect(() => {
@@ -82,7 +138,19 @@ const AssistantPanel = ({
     .split(/\s+/)
     .filter(Boolean).length;
 
+  const normalizedTargetWordCount = React.useMemo(() => {
+    const value = Number(targetWordCount);
+
+    if (!Number.isFinite(value) || value < 500) {
+      return undefined;
+    }
+
+    return Math.round(value);
+  }, [targetWordCount]);
+
   const canGenerate = intent !== "custom" || customPrompt.trim().length > 0;
+  const outlineSource = outlinePrompt.trim() || selectedText || documentText || baselineText;
+  const canGenerateBook = Boolean(outlineSource.trim() && normalizedTargetWordCount);
 
   const handleGenerate = () => {
     onCreateProposal({
@@ -94,6 +162,28 @@ const AssistantPanel = ({
       documentText,
       baselineText,
       useBaseline: useBaseline && baselines.length > 0,
+      targetWordCount: normalizedTargetWordCount,
+    });
+  };
+
+  const handleBookGeneration = () => {
+    if (!outlineSource.trim()) {
+      showError("Paste or upload a chapter-by-chapter outline before using the A button.");
+      return;
+    }
+
+    onCreateProposal({
+      intent: "book",
+      tone,
+      length,
+      customPrompt: `Generate a full fiction book from this chapter-by-chapter outline. Target word count: ${
+        normalizedTargetWordCount?.toLocaleString() ?? "25,000"
+      } words. Write complete chapter drafts from each outline entry, keeping the story moving scene by scene.`,
+      selectedText: outlineSource,
+      documentText: "",
+      baselineText: useBaseline && baselines.length > 0 ? baselineText : "",
+      useBaseline: useBaseline && baselines.length > 0,
+      targetWordCount: normalizedTargetWordCount,
     });
   };
 
@@ -110,7 +200,7 @@ const AssistantPanel = ({
             <div>
               <CardTitle className="text-lg">Prompt-first assistant</CardTitle>
               <CardDescription>
-                Choose the outcome, review a proposal, then approve where it goes.
+                Tell me what you want, review the proposal, then approve where it goes.
               </CardDescription>
             </div>
           </div>
@@ -123,7 +213,7 @@ const AssistantPanel = ({
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-900 dark:text-white">
-            What do you want to do?
+            What would you like me to do?
           </label>
           <Select value={intent} onValueChange={(value) => setIntent(value as Intent)}>
             <SelectTrigger className="rounded-2xl">
@@ -180,6 +270,39 @@ const AssistantPanel = ({
           </div>
         </div>
 
+        <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+          <label className="text-sm font-semibold text-slate-900 dark:text-white">
+            Target word count
+          </label>
+          <Input
+            type="number"
+            min={500}
+            step={500}
+            value={targetWordCount}
+            onChange={(event) => setTargetWordCount(event.target.value)}
+            className="rounded-2xl"
+            placeholder="Example: 50000"
+          />
+          <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Used by the A button to shape the full-book draft.
+          </p>
+        </div>
+
+        <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+          <label className="text-sm font-semibold text-slate-900 dark:text-white">
+            Chapter outline / prompt
+          </label>
+          <Textarea
+            value={outlinePrompt}
+            onChange={(event) => setOutlinePrompt(event.target.value)}
+            placeholder="Paste your chapter-by-chapter outline here, or select/upload it in the editor."
+            className="min-h-28 rounded-2xl"
+          />
+          <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+            The A button starts from this outline and writes chapter drafts from it.
+          </p>
+        </div>
+
         <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-900">
           <div>
             <p className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -187,7 +310,9 @@ const AssistantPanel = ({
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {baselines.length
-                ? `${baselines.length} uploaded baseline ${baselines.length === 1 ? "document" : "documents"}`
+                ? `${baselines.length} uploaded baseline ${
+                    baselines.length === 1 ? "document" : "documents"
+                  }`
                 : "Upload a document to enable this"}
             </p>
           </div>
@@ -206,7 +331,7 @@ const AssistantPanel = ({
             <Textarea
               value={customPrompt}
               onChange={(event) => setCustomPrompt(event.target.value)}
-              placeholder="Example: turn this into a sharper LinkedIn post with a stronger opening."
+              placeholder="Example: turn this into a sharper scene with a stronger opening."
               className="min-h-28 rounded-2xl"
             />
           </div>
@@ -226,7 +351,7 @@ const AssistantPanel = ({
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
             {selectedText
               ? excerpt(selectedText)
-              : excerpt(documentText) || "Start typing to give the assistant more context."}
+              : excerpt(documentText) || "Start typing, paste an outline, or upload a book file."}
           </p>
         </div>
 
@@ -240,14 +365,31 @@ const AssistantPanel = ({
 
         <Separator />
 
-        <Button
-          type="button"
-          className="w-full rounded-2xl bg-emerald-600 font-semibold text-white shadow-sm hover:bg-emerald-700"
-          onClick={handleGenerate}
-          disabled={!canGenerate}
-        >
-          Generate proposal for review
-        </Button>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+          <Button
+            type="button"
+            className="rounded-2xl bg-emerald-600 font-semibold text-white shadow-sm hover:bg-emerald-700"
+            onClick={handleGenerate}
+            disabled={!canGenerate}
+          >
+            Generate proposal for review
+          </Button>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                className="h-12 w-12 rounded-2xl bg-indigo-600 text-lg font-black text-white shadow-sm hover:bg-indigo-700"
+                onClick={handleBookGeneration}
+                disabled={!normalizedTargetWordCount}
+                aria-label="Generate full book from outline"
+              >
+                A
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Generate from outline</TooltipContent>
+          </Tooltip>
+        </div>
 
         <p className="text-center text-xs leading-5 text-slate-500 dark:text-slate-400">
           The assistant never applies changes directly. You review first.
