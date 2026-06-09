@@ -1,8 +1,24 @@
 import * as React from "react";
-import { Download, FileText, Import, Printer, Save, Sparkles, Trash2 } from "lucide-react";
+import {
+  Download,
+  FileText,
+  Import,
+  Printer,
+  Save,
+  Sparkles,
+  Trash2,
+  BookOpen,
+  FileUp,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { showSuccess } from "@/utils/toast";
@@ -22,8 +38,12 @@ import {
 import {
   isSupportedTextFile,
   notifyUnsupportedFiles,
-  readFileAsText,
+  readFileAsBaseline,
 } from "@/components/writing-assistant/file-utils";
+import {
+  exportAsPdf,
+  exportAsEpub,
+} from "@/components/writing-assistant/export-utils";
 import type {
   ApplyMode,
   AssistantRequest,
@@ -32,7 +52,8 @@ import type {
   EditorSelectionState,
 } from "@/components/writing-assistant/types";
 
-const defaultDocumentHtml = "<h1>Untitled document</h1><p>Start writing your piece here.</p>";
+const defaultDocumentHtml =
+  "<h1>Untitled document</h1><p>Start writing your piece here.</p>";
 
 const Index = () => {
   const editorRef = React.useRef<DocumentEditorHandle>(null);
@@ -45,25 +66,20 @@ const Index = () => {
     text: "",
     html: "",
   });
-  const [proposal, setProposal] = React.useState<ReturnType<typeof generateAssistantProposal> | null>(null);
+  const [proposal, setProposal] = React.useState<
+    ReturnType<typeof generateAssistantProposal> | null
+  >(null);
   const [reviewOpen, setReviewOpen] = React.useState(false);
 
+  /* ---------- Local storage ---------- */
   React.useEffect(() => {
     const savedTitle = localStorage.getItem(STORAGE_KEYS.documentTitle);
     const savedDocument = localStorage.getItem(STORAGE_KEYS.document);
     const savedBaselines = localStorage.getItem(STORAGE_KEYS.baselines);
 
-    if (savedTitle) {
-      setDocumentTitle(savedTitle);
-    }
-
-    if (savedDocument !== null) {
-      setDocumentHtml(savedDocument);
-    }
-
-    if (savedBaselines) {
-      setBaselines(JSON.parse(savedBaselines));
-    }
+    if (savedTitle) setDocumentTitle(savedTitle);
+    if (savedDocument !== null) setDocumentHtml(savedDocument);
+    if (savedBaselines) setBaselines(JSON.parse(savedBaselines));
   }, []);
 
   React.useEffect(() => {
@@ -78,13 +94,20 @@ const Index = () => {
     localStorage.setItem(STORAGE_KEYS.baselines, JSON.stringify(baselines));
   }, [baselines]);
 
-  const handleSelectionChange = React.useCallback((nextSelection: EditorSelectionState) => {
-    setSelection(nextSelection);
-  }, []);
+  /* ---------- Handlers ---------- */
+  const handleSelectionChange = React.useCallback(
+    (nextSelection: EditorSelectionState) => {
+      setSelection(nextSelection);
+    },
+    []
+  );
 
-  const handleEditorCommand = React.useCallback((command: EditorCommand) => {
-    editorRef.current?.runCommand(command);
-  }, []);
+  const handleEditorCommand = React.useCallback(
+    (command: EditorCommand) => {
+      editorRef.current?.runCommand(command);
+    },
+    []
+  );
 
   const handleCreateProposal = React.useCallback((request: AssistantRequest) => {
     const generatedProposal = generateAssistantProposal(request);
@@ -95,59 +118,41 @@ const Index = () => {
 
   const handleApplyProposal = React.useCallback(
     (mode: ApplyMode) => {
-      if (!proposal) {
-        return;
-      }
-
+      if (!proposal) return;
       const html = textToHtml(proposal.output);
-
-      if (mode === "replace-selection") {
-        editorRef.current?.replaceSelection(html);
-      }
-
-      if (mode === "insert-cursor") {
-        editorRef.current?.insertAtCursor(html);
-      }
-
-      if (mode === "insert-below") {
-        editorRef.current?.insertBelowSelection(html);
-      }
-
-      if (mode === "insert-end") {
-        editorRef.current?.insertAtEnd(html);
-      }
-
+      if (mode === "replace-selection") editorRef.current?.replaceSelection(html);
+      if (mode === "insert-cursor") editorRef.current?.insertAtCursor(html);
+      if (mode === "insert-below") editorRef.current?.insertBelowSelection(html);
+      if (mode === "insert-end") editorRef.current?.insertAtEnd(html);
       setProposal(null);
       setReviewOpen(false);
       showSuccess("Assistant proposal applied.");
     },
-    [proposal],
+    [proposal]
   );
 
   const handleAddBaselines = React.useCallback((documents: BaselineDocument[]) => {
     setBaselines((current) => [...documents, ...current]);
-    showSuccess(`${documents.length} baseline ${documents.length === 1 ? "document" : "documents"} added.`);
+    showSuccess(
+      `${documents.length} baseline ${
+        documents.length === 1 ? "document" : "documents"
+      } added.`
+    );
   }, []);
 
   const handleRemoveBaseline = React.useCallback((id: string) => {
-    setBaselines((current) => current.filter((document) => document.id !== id));
+    setBaselines((current) => current.filter((doc) => doc.id !== id));
   }, []);
 
   const handleClearBaselines = () => {
-    if (!window.confirm("Remove all uploaded baseline documents?")) {
-      return;
-    }
-
+    if (!window.confirm("Remove all uploaded baseline documents?")) return;
     setBaselines([]);
     showSuccess("Baseline documents cleared.");
   };
 
   const handleImportDocument = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
-
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     if (!isSupportedTextFile(file)) {
       notifyUnsupportedFiles();
@@ -155,21 +160,29 @@ const Index = () => {
       return;
     }
 
-    const imported = await readFileAsText(file);
+    const imported = await readFileAsBaseline(file);
     setDocumentTitle(imported.name.replace(/\.[^.]+$/, "") || "Imported document");
     setDocumentHtml(textToHtml(imported.text));
     showSuccess("Document imported.");
     event.currentTarget.value = "";
   };
 
-  const handleExport = (format: "txt" | "html") => {
+  const handleExport = async (format: "txt" | "html" | "pdf" | "epub") => {
     const html = editorRef.current?.getHtml() || documentHtml;
     const text = htmlToText(html);
     const fileName = slugify(documentTitle);
 
-    const content =
-      format === "html"
-        ? `<!doctype html>
+    if (format === "txt") {
+      const blob = new Blob([text], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${fileName}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showSuccess("Document exported as TXT.");
+    } else if (format === "html") {
+      const content = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -178,28 +191,31 @@ const Index = () => {
 <body>
 ${html}
 </body>
-</html>`
-        : text;
-
-    const blob = new Blob([content], {
-      type: format === "html" ? "text/html" : "text/plain",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = `${fileName}.${format}`;
-    link.click();
-    URL.revokeObjectURL(url);
-
-    showSuccess(`Document exported as ${format.toUpperCase()}.`);
+</html>`;
+      const blob = new Blob([content], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${fileName}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showSuccess("Document exported as HTML.");
+    } else if (format === "pdf") {
+      await exportAsPdf(documentTitle, html);
+      showSuccess("Document exported as PDF.");
+    } else if (format === "epub") {
+      await exportAsEpub(documentTitle, text);
+      showSuccess("Document exported as EPUB.");
+    }
   };
 
   const handleNewDocument = () => {
-    if (!window.confirm("Start a new document? Your current document is saved locally, but the editor will be cleared.")) {
+    if (
+      !window.confirm(
+        "Start a new document? Your current document is saved locally, but the editor will be cleared."
+      )
+    )
       return;
-    }
-
     setDocumentTitle("Untitled document");
     setDocumentHtml(defaultDocumentHtml);
     showSuccess("New document ready.");
@@ -207,15 +223,13 @@ ${html}
   };
 
   const handleClearDocument = () => {
-    if (!window.confirm("Clear the current document? Baseline uploads will stay intact.")) {
-      return;
-    }
-
+    if (!window.confirm("Clear the current document? Baseline uploads will stay intact.")) return;
     setDocumentHtml("");
     showSuccess("Document cleared.");
     setTimeout(() => editorRef.current?.focus(), 0);
   };
 
+  /* ---------- Render ---------- */
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
@@ -225,7 +239,9 @@ ${html}
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">AI Writing Assistant</h1>
+              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+                AI Writing Assistant
+              </h1>
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 Prompt first. Review every change. Keep your voice as context.
               </p>
@@ -247,6 +263,7 @@ ${html}
       </header>
 
       <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_390px] lg:px-6">
+        {/* ---------- Editor column ---------- */}
         <section className="space-y-4">
           <Card className="overflow-hidden border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <CardHeader className="pb-3">
@@ -254,7 +271,7 @@ ${html}
                 <div className="min-w-0 flex-1">
                   <Input
                     value={documentTitle}
-                    onChange={(event) => setDocumentTitle(event.target.value)}
+                    onChange={(e) => setDocumentTitle(e.target.value)}
                     className="h-12 border-0 bg-transparent px-0 text-2xl font-bold tracking-tight shadow-none focus-visible:ring-0"
                   />
                   <CardDescription className="mt-2">
@@ -272,6 +289,7 @@ ${html}
                     <Save className="mr-2 h-4 w-4" />
                     Save
                   </Button>
+
                   <Button
                     type="button"
                     variant="outline"
@@ -281,6 +299,8 @@ ${html}
                     <Import className="mr-2 h-4 w-4" />
                     Import
                   </Button>
+
+                  {/* Export options */}
                   <Button
                     type="button"
                     variant="outline"
@@ -288,8 +308,9 @@ ${html}
                     onClick={() => handleExport("txt")}
                   >
                     <Download className="mr-2 h-4 w-4" />
-                    Export
+                    TXT
                   </Button>
+
                   <Button
                     type="button"
                     variant="outline"
@@ -299,15 +320,27 @@ ${html}
                     <FileText className="mr-2 h-4 w-4" />
                     HTML
                   </Button>
+
                   <Button
                     type="button"
                     variant="outline"
                     className="rounded-2xl"
-                    onClick={() => window.print()}
+                    onClick={() => handleExport("pdf")}
                   >
                     <Printer className="mr-2 h-4 w-4" />
-                    Print
+                    PDF
                   </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-2xl"
+                    onClick={() => handleExport("epub")}
+                  >
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    EPUB
+                  </Button>
+
                   <Button
                     type="button"
                     variant="destructive"
@@ -322,7 +355,7 @@ ${html}
                 <input
                   ref={importInputRef}
                   type="file"
-                  accept=".txt,.md,.markdown,.csv,.json,text/plain,text/markdown,text/csv,application/json"
+                  accept=".txt,.md,.markdown,.csv,.json,.epub,.pdf"
                   className="hidden"
                   onChange={handleImportDocument}
                 />
@@ -352,6 +385,7 @@ ${html}
           </Button>
         </section>
 
+        {/* ---------- Sidebar (assistant & baselines) ---------- */}
         <aside className="space-y-4">
           <AssistantPanel
             selectedText={selection.text}
@@ -368,6 +402,7 @@ ${html}
         </aside>
       </main>
 
+      {/* Review dialog */}
       <ReviewDialog
         proposal={proposal}
         open={reviewOpen}
