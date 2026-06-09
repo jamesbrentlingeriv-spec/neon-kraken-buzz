@@ -2,19 +2,9 @@ import * as React from "react";
 import { BookOpen, FileUp, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  isSupportedTextFile,
-  notifyUnsupportedFiles,
-  readFileAsText,
-} from "./file-utils";
+import { isSupportedTextFile, notifyUnsupportedFiles, readFileAsText } from "./file-utils";
 import type { BaselineDocument } from "./types";
 
 interface UploadBaselineProps {
@@ -42,15 +32,9 @@ const UploadBaseline = ({
       return;
     }
 
-    try {
-      const documents = await Promise.all(
-        supportedFiles.map(readFileAsText),
-      );
-      onAdd(documents);
-      event.currentTarget.value = "";
-    } catch (error) {
-      showError("Failed to process file. Please try another file.");
-    }
+    const documents = await Promise.all(supportedFiles.map(readFileAsText));
+    onAdd(documents);
+    event.currentTarget.value = "";
   };
 
   return (
@@ -79,14 +63,14 @@ const UploadBaseline = ({
           className="w-full rounded-2xl bg-indigo-600 font-semibold text-white shadow-sm hover:bg-indigo-700"
         >
           <FileUp className="mr-2 h-4 w-4" />
-          Upload .txt, .md, .csv, .json, .epub, or .pdf
+          Upload .txt, .md, .csv, or .json
         </Button>
 
         <input
           ref={inputRef}
           type="file"
           multiple
-          accept=".txt,.md,.markdown,.csv,.json,.epub,.pdf"
+          accept=".txt,.md,.markdown,.csv,.json,text/plain,text/markdown,text/csv,application/json"
           className="hidden"
           onChange={handleFiles}
         />
