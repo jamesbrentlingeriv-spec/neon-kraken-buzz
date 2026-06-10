@@ -23,6 +23,10 @@ import {
   Quote,
   Link2,
   RemoveFormatting,
+  Menu,
+  PenLine,
+  Bot,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,10 +39,18 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { showSuccess } from "@/utils/toast";
 import AssistantPanel from "@/components/writing-assistant/AssistantPanel";
 import DocumentEditor from "@/components/writing-assistant/DocumentEditor";
@@ -84,6 +96,15 @@ const FORMAT_BUTTONS: { cmd: EditorCommand; label: string; icon: React.ElementTy
   { cmd: "clearFormatting", label: "Clear formatting", icon: RemoveFormatting },
 ];
 
+type MobileSection = "writer" | "novelist" | "assistant" | "baselines";
+
+const MOBILE_NAV_ITEMS: { id: MobileSection; label: string; icon: React.ElementType; color: string }[] = [
+  { id: "writer", label: "Writer", icon: PenLine, color: "text-gray-700 dark:text-gray-300" },
+  { id: "novelist", label: "Novelist", icon: Feather, color: "text-purple-600 dark:text-purple-400" },
+  { id: "assistant", label: "Assistant", icon: WandSparkles, color: "text-emerald-600 dark:text-emerald-400" },
+  { id: "baselines", label: "Baselines", icon: BookOpen, color: "text-indigo-600 dark:text-indigo-400" },
+];
+
 /* ─── Component ─── */
 
 const Index = () => {
@@ -95,6 +116,10 @@ const Index = () => {
   const [selection, setSelection] = React.useState<EditorSelectionState>({ hasSelection: false, text: "", html: "" });
   const [proposal, setProposal] = React.useState<ReturnType<typeof generateAssistantProposal> | null>(null);
   const [reviewOpen, setReviewOpen] = React.useState(false);
+
+  // Mobile state
+  const [mobileSection, setMobileSection] = React.useState<MobileSection>("writer");
+  const [mobileSheetOpen, setMobileSheetOpen] = React.useState(false);
 
   /* ─── Persistence ─── */
   React.useEffect(() => {
@@ -179,6 +204,60 @@ const Index = () => {
     showSuccess(`Chapter ${num} drafted and inserted.`);
   }, []);
 
+  const handleMobileNav = (section: MobileSection) => {
+    setMobileSection(section);
+    setMobileSheetOpen(false);
+  };
+
+  const editorWordCount = htmlToText(documentHtml).trim().split(/\s+/).filter(Boolean).length;
+  const editorChapterCount = (documentHtml.match(/(?:<h1[^>]*>|<h2[^>]*>|^#+\s)/gim) || []).length;
+
+  /* ─── Shared right-pane content ─── */
+  const renderRightPane = (tabDefault: string) => (
+    <Tabs defaultValue={tabDefault} className="flex flex-col h-full">
+      <div className="shrink-0 border-b border-gray-200 px-3 pt-2 pb-0 dark:border-gray-700">
+        <TabsList className="h-8 w-full rounded-lg bg-gray-100 p-0.5 dark:bg-gray-700">
+          <TabsTrigger value="novelist" className="flex-1 gap-1 rounded-md px-2 py-1 text-[11px] data-[state=active]:bg-white data-[state=active]:text-purple-700 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-purple-300">
+            <Feather className="h-3 w-3" /> Novelist
+          </TabsTrigger>
+          <TabsTrigger value="assistant" className="flex-1 gap-1 rounded-md px-2 py-1 text-[11px] data-[state=active]:bg-white data-[state=active]:text-emerald-700 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-emerald-300">
+            <WandSparkles className="h-3 w-3" /> Assistant
+          </TabsTrigger>
+          <TabsTrigger value="baselines" className="flex-1 gap-1 rounded-md px-2 py-1 text-[11px] data-[state=active]:bg-white data-[state=active]:text-indigo-700 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-indigo-300">
+            <BookOpen className="h-3 w-3" /> Baselines
+          </TabsTrigger>
+        </TabsList>
+      </div>
+
+      <TabsContent value="novelist" className="flex-1 flex flex-col overflow-hidden pt-0 mt-0 data-[state=inactive]:hidden">
+        <NovelistChat
+          onChapterGenerated={novelChapterGenerated}
+          editorDocumentText={htmlToText(documentHtml)}
+          editorChapterCount={editorChapterCount}
+          editorWordCount={editorWordCount}
+        />
+      </TabsContent>
+
+      <TabsContent value="assistant" className="flex-1 overflow-auto pt-0 mt-0 data-[state=inactive]:hidden p-3">
+        <AssistantPanel
+          selectedText={selection.text}
+          documentText={htmlToText(documentHtml)}
+          baselines={baselines}
+          onCreateProposal={handleCreateProposal}
+        />
+      </TabsContent>
+
+      <TabsContent value="baselines" className="flex-1 overflow-auto pt-0 mt-0 data-[state=inactive]:hidden p-3">
+        <UploadBaseline
+          baselines={baselines}
+          onAdd={handleAddBaselines}
+          onRemove={handleRemoveBaseline}
+          onClear={handleClearBaselines}
+        />
+      </TabsContent>
+    </Tabs>
+  );
+
   /* ─── Render ─── */
   return (
     <div className="h-screen w-full flex flex-row overflow-hidden bg-gray-50 dark:bg-gray-900">
@@ -187,6 +266,46 @@ const Index = () => {
         {/* ── UNIFIED TOP TOOLBAR ── */}
         <header className="shrink-0 border-b border-gray-200 bg-white px-4 py-2 dark:border-gray-800 dark:bg-gray-950">
           <div className="flex items-center gap-3">
+            {/* Mobile hamburger */}
+            <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg md:hidden shrink-0"
+                >
+                  <Menu className="h-4 w-4" />
+                  <span className="sr-only">Open menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64 p-0">
+                <SheetHeader className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2">
+                    <img src="/liberai.png" alt="LiberAI" className="h-7 w-7 rounded-lg object-contain" />
+                    <SheetTitle className="text-sm font-semibold">LiberAI</SheetTitle>
+                  </div>
+                </SheetHeader>
+                <div className="py-2">
+                  {MOBILE_NAV_ITEMS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleMobileNav(item.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                        mobileSection === item.id
+                          ? "bg-gray-100 dark:bg-gray-800 border-r-2 border-purple-600"
+                          : "text-gray-600 dark:text-gray-400"
+                      }`}
+                    >
+                      <item.icon className={`h-4 w-4 ${item.color}`} />
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </SheetContent>
+            </Sheet>
+
             {/* Brand */}
             <div className="hidden items-center gap-2 lg:flex mr-2">
               <img src="/liberai.png" alt="LiberAI" className="h-8 w-8 rounded-lg object-contain" />
@@ -196,7 +315,7 @@ const Index = () => {
             <Separator orientation="vertical" className="h-6 hidden lg:block" />
 
             {/* ── Left: formatting ── */}
-            <div className="flex items-center gap-1 flex-wrap">
+            <div className="hidden sm:flex items-center gap-1 flex-wrap">
               <Select onValueChange={(v) => runCmd(v as EditorCommand)}>
                 <SelectTrigger className="h-8 w-[110px] rounded-lg border-gray-200 text-xs dark:border-gray-700">
                   <SelectValue placeholder="Paragraph" />
@@ -229,28 +348,28 @@ const Index = () => {
 
             {/* ── Right: document actions ── */}
             <div className="flex items-center gap-1 flex-wrap">
-              <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs" onClick={() => showSuccess("Saved locally.")}>
+              <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs hidden sm:inline-flex" onClick={() => showSuccess("Saved locally.")}>
                 <Save className="mr-1 h-3.5 w-3.5" /> Save
               </Button>
               <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs" onClick={() => importInputRef.current?.click()}>
                 <Import className="mr-1 h-3.5 w-3.5" /> Import
               </Button>
-              <input ref={importInputRef} type="file" accept=".epub,.pdf,application/epub+zip,application/pdf" className="hidden" onChange={handleImport} />
-              <Separator orientation="vertical" className="h-5" />
-              <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs" onClick={() => handleExport("txt")}>
+              <input ref={importInputRef} type="file" accept=".epub,.pdf,.txt,application/epub+zip,application/pdf,text/plain" className="hidden" onChange={handleImport} />
+              <Separator orientation="vertical" className="h-5 hidden sm:block" />
+              <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs hidden sm:inline-flex" onClick={() => handleExport("txt")}>
                 <Download className="mr-1 h-3.5 w-3.5" /> TXT
               </Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs" onClick={() => handleExport("html")}>
+              <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs hidden md:inline-flex" onClick={() => handleExport("html")}>
                 <FileText className="mr-1 h-3.5 w-3.5" /> HTML
               </Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs" onClick={() => handleExport("pdf")}>
+              <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs hidden md:inline-flex" onClick={() => handleExport("pdf")}>
                 <Printer className="mr-1 h-3.5 w-3.5" /> PDF
               </Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs" onClick={() => handleExport("epub")}>
+              <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs hidden md:inline-flex" onClick={() => handleExport("epub")}>
                 <BookOpen className="mr-1 h-3.5 w-3.5" /> EPUB
               </Button>
-              <Separator orientation="vertical" className="h-5" />
-              <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs text-red-500 hover:text-red-600" onClick={() => {
+              <Separator orientation="vertical" className="h-5 hidden sm:block" />
+              <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg text-xs text-red-500 hover:text-red-600 hidden sm:inline-flex" onClick={() => {
                 if (!window.confirm("Clear the current document?")) return;
                 setDocumentHtml("");
                 showSuccess("Document cleared.");
@@ -274,7 +393,37 @@ const Index = () => {
 
         {/* ── WRITING CANVAS (scrollable) ── */}
         <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-950">
-          <div className="mx-auto max-w-3xl w-full px-6 py-6">
+          {/* Mobile: show selected section content */}
+          <div className="md:hidden">
+            {mobileSection === "novelist" && (
+              <div className="h-[calc(100vh-160px)] flex flex-col">
+                {renderRightPane("novelist")}
+              </div>
+            )}
+            {mobileSection === "assistant" && (
+              <div className="h-[calc(100vh-160px)] overflow-auto">
+                {renderRightPane("assistant")}
+              </div>
+            )}
+            {mobileSection === "baselines" && (
+              <div className="h-[calc(100vh-160px)] overflow-auto">
+                {renderRightPane("baselines")}
+              </div>
+            )}
+            {mobileSection === "writer" && (
+              <div className="mx-auto max-w-3xl w-full px-4 py-4">
+                <DocumentEditor
+                  ref={editorRef}
+                  initialHtml={documentHtml}
+                  onChange={setDocumentHtml}
+                  onSelectionChange={handleSelectionChange}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: always show editor */}
+          <div className="hidden md:block mx-auto max-w-3xl w-full px-6 py-6">
             <DocumentEditor
               ref={editorRef}
               initialHtml={documentHtml}
@@ -290,51 +439,9 @@ const Index = () => {
         </div>
       </div>
 
-      {/* ═══════════ RIGHT PANE: AI ASSISTANT (tabbed) ═══════════ */}
-      <aside className="w-[400px] shrink-0 flex flex-col border-l border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <Tabs defaultValue="novelist" className="flex flex-col h-full">
-          {/* Tab bar */}
-          <div className="shrink-0 border-b border-gray-200 px-3 pt-2 pb-0 dark:border-gray-700">
-            <TabsList className="h-8 w-full rounded-lg bg-gray-100 p-0.5 dark:bg-gray-700">
-              <TabsTrigger value="novelist" className="flex-1 gap-1 rounded-md px-2 py-1 text-[11px] data-[state=active]:bg-white data-[state=active]:text-purple-700 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-purple-300">
-                <Feather className="h-3 w-3" /> Novelist
-              </TabsTrigger>
-              <TabsTrigger value="assistant" className="flex-1 gap-1 rounded-md px-2 py-1 text-[11px] data-[state=active]:bg-white data-[state=active]:text-emerald-700 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-emerald-300">
-                <WandSparkles className="h-3 w-3" /> Assistant
-              </TabsTrigger>
-              <TabsTrigger value="baselines" className="flex-1 gap-1 rounded-md px-2 py-1 text-[11px] data-[state=active]:bg-white data-[state=active]:text-indigo-700 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-indigo-300">
-                <BookOpen className="h-3 w-3" /> Baselines
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="novelist" className="flex-1 flex flex-col overflow-hidden pt-0 mt-0 data-[state=inactive]:hidden">
-            <NovelistChat
-              onChapterGenerated={novelChapterGenerated}
-              editorDocumentText={htmlToText(documentHtml)}
-              editorChapterCount={(documentHtml.match(/(?:<h1[^>]*>|<h2[^>]*>|^#+\s)/gim) || []).length}
-              editorWordCount={htmlToText(documentHtml).trim().split(/\s+/).filter(Boolean).length}
-            />
-          </TabsContent>
-
-          <TabsContent value="assistant" className="flex-1 overflow-auto pt-0 mt-0 data-[state=inactive]:hidden p-3">
-            <AssistantPanel
-              selectedText={selection.text}
-              documentText={htmlToText(documentHtml)}
-              baselines={baselines}
-              onCreateProposal={handleCreateProposal}
-            />
-          </TabsContent>
-
-          <TabsContent value="baselines" className="flex-1 overflow-auto pt-0 mt-0 data-[state=inactive]:hidden p-3">
-            <UploadBaseline
-              baselines={baselines}
-              onAdd={handleAddBaselines}
-              onRemove={handleRemoveBaseline}
-              onClear={handleClearBaselines}
-            />
-          </TabsContent>
-        </Tabs>
+      {/* ═══════════ RIGHT PANE: AI ASSISTANT (tabbed) - desktop only ═══════════ */}
+      <aside className="hidden md:flex w-[400px] shrink-0 flex-col border-l border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+        {renderRightPane("novelist")}
       </aside>
 
       {/* Review dialog */}
