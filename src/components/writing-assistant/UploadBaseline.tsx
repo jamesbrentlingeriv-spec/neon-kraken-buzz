@@ -48,7 +48,7 @@ const UploadBaseline = ({
             <div>
               <CardTitle className="text-lg">Previous work</CardTitle>
               <CardDescription>
-                Upload past writing (PDF or EPUB) so the assistant can use it as baseline context.
+                Upload past writing (PDF, EPUB, or TXT) so the assistant can use it as baseline context.
               </CardDescription>
             </div>
           </div>
@@ -63,21 +63,21 @@ const UploadBaseline = ({
           className="w-full rounded-2xl bg-indigo-600 font-semibold text-white shadow-sm hover:bg-indigo-700"
         >
           <FileUp className="mr-2 h-4 w-4" />
-          Upload .epub or .pdf
+          Upload .epub, .pdf, or .txt
         </Button>
 
         <input
           ref={inputRef}
           type="file"
           multiple
-          accept=".epub,.pdf,application/epub+zip,application/pdf"
+          accept=".epub,.pdf,.txt,application/epub+zip,application/pdf,text/plain"
           className="hidden"
           onChange={handleFiles}
         />
 
         {baselines.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-            No baseline documents yet. Upload a PDF or EPUB file.
+            No baseline documents yet. Upload a PDF, EPUB, or TXT file.
           </div>
         ) : (
           <div className="space-y-3">

@@ -275,7 +275,7 @@ const DocumentEditor = React.forwardRef<DocumentEditorHandle, DocumentEditorProp
         suppressContentEditableWarning
         data-placeholder="Start writing your document..."
         className={cn(
-          "editor-content min-h-[520px] rounded-3xl border border-slate-200 bg-white p-6 outline-none ring-offset-white transition focus:ring-4 focus:ring-indigo-200 dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950 dark:focus:ring-indigo-950 lg:p-8",
+          "editor-content w-full min-h-[60vh] outline-none transition focus:ring-0 text-gray-900 dark:text-gray-100 leading-relaxed text-base",
           className,
         )}
         onInput={emitChange}

@@ -4,7 +4,7 @@ import type { BaselineDocument } from "./types";
 import { parseEpub, parsePdf } from "./document-parser";
 
 /** Supported file extensions for baseline uploads */
-export const ALL_SUPPORTED_EXTENSIONS = [".epub", ".pdf"] as const;
+export const ALL_SUPPORTED_EXTENSIONS = [".epub", ".pdf", ".txt"] as const;
 
 /** Check if a file is supported (PDF or EPUB) */
 export function isSupportedTextFile(file: File): boolean {
@@ -33,6 +33,8 @@ export async function readFileAsBaseline(file: File): Promise<BaselineDocument> 
     text = await parseEpub(file);
   } else if (extension === ".pdf") {
     text = await parsePdf(file);
+  } else if (extension === ".txt") {
+    text = await readFileAsText(file);
   } else {
     throw new Error(`Unsupported file type: ${extension}`);
   }
@@ -47,7 +49,17 @@ export async function readFileAsBaseline(file: File): Promise<BaselineDocument> 
   };
 }
 
+/** Read a plain text file to string */
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+
 /** Notify user when an unsupported file is selected */
 export function notifyUnsupportedFiles(): void {
-  showError("Supported files: .epub, .pdf");
+  showError("Supported files: .epub, .pdf, .txt");
 }
