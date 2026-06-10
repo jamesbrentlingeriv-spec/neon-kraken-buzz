@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import { WandSparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
