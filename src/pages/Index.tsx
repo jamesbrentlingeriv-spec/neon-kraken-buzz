@@ -30,7 +30,6 @@ import UploadBaseline from "@/components/writing-assistant/UploadBaseline";
 import ReviewDialog from "@/components/writing-assistant/ReviewDialog";
 import { generateAssistantProposal } from "@/components/writing-assistant/assistant-engine";
 import {
-  STORAGE_KEYS,
   htmlToText,
   slugify,
   textToHtml,
@@ -73,9 +72,9 @@ const Index = () => {
 
   /* ---------- Local storage ---------- */
   React.useEffect(() => {
-    const savedTitle = localStorage.getItem(STORAGE_KEYS.documentTitle);
-    const savedDocument = localStorage.getItem(STORAGE_KEYS.document);
-    const savedBaselines = localStorage.getItem(STORAGE_KEYS.baselines);
+    const savedTitle = localStorage.getItem("ai-writing-assistant-document-title-v1");
+    const savedDocument = localStorage.getItem("ai-writing-assistant-document-html-v1");
+    const savedBaselines = localStorage.getItem("ai-writing-assistant-baselines-v1");
 
     if (savedTitle) setDocumentTitle(savedTitle);
     if (savedDocument !== null) setDocumentHtml(savedDocument);
@@ -83,15 +82,15 @@ const Index = () => {
   }, []);
 
   React.useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.documentTitle, documentTitle);
+    localStorage.setItem("ai-writing-assistant-document-title-v1", documentTitle);
   }, [documentTitle]);
 
   React.useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.document, documentHtml);
+    localStorage.setItem("ai-writing-assistant-document-html-v1", documentHtml);
   }, [documentHtml]);
 
   React.useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.baselines, JSON.stringify(baselines));
+    localStorage.setItem("ai-writing-assistant-baselines-v1", JSON.stringify(baselines));
   }, [baselines]);
 
   /* ---------- Handlers ---------- */
@@ -253,7 +252,7 @@ ${html}
               Word processor
             </Badge>
             <Badge className="rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-              Baseline uploads
+              PDF/EPUB uploads
             </Badge>
             <Badge className="rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
               Autosaves locally
@@ -355,7 +354,7 @@ ${html}
                 <input
                   ref={importInputRef}
                   type="file"
-                  accept=".txt,.md,.markdown,.csv,.json,.epub,.pdf"
+                  accept=".epub,.pdf,application/epub+zip,application/pdf"
                   className="hidden"
                   onChange={handleImportDocument}
                 />
