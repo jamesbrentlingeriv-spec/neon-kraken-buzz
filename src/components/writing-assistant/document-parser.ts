@@ -1,14 +1,26 @@
-import { PDFDocumentProxy, getDocument } from "pdfjs-dist";
+import { PDFDocumentProxy, getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import { Book } from "epubjs";
 import { readFileAsArrayBuffer } from "./file-utils";
 
-/**
- * Extract plain text from an EPUB file.
- * Returns a single string with all chapter text concatenated.
- */
+/* -------------------------------------------------------------------------- */
+/*  PDF.js – set the worker (required for Vite)                               */
+/* -------------------------------------------------------------------------- */
+if (import.meta.env.DEV) {
+  // In development Vite serves the worker from the pdfjs-dist package
+  // The exact path works for both dev and build modes.
+  GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.js",
+    import.meta.url,
+  ).toString();
+}
+
+/* -------------------------------------------------------------------------- */
+/*  EPUB parsing – create a Blob URL so epubjs can load the file correctly    */
+/* -------------------------------------------------------------------------- */
 export async function parseEpub(file: File): Promise<string> {
-  const arrayBuffer = await readFileAsArrayBuffer(file);
-  const book = new Book(arrayBuffer);
+  // epubjs can read a Blob URL directly; we don’t need to convert to ArrayBuffer.
+  const blobUrl = URL.createObjectURL(file);
+  const book = new Book(blobUrl);
   await book.loaded.navigation; // ensure spine is ready
 
   const chapters = await Promise.all(
@@ -18,16 +30,18 @@ export async function parseEpub(file: File): Promise<string> {
       const div = document.createElement("div");
       div.innerHTML = text;
       return div.textContent?.trim() ?? "";
-    })
+    }),
   );
+
+  // Clean up the temporary URL
+  URL.revokeObjectURL(blobUrl);
 
   return chapters.filter(Boolean).join("\n\n");
 }
 
-/**
- * Extract plain text from a PDF file.
- * Returns a single string with all page text concatenated.
- */
+/* -------------------------------------------------------------------------- */
+/*  PDF parsing – unchanged logic, now works because the worker is set up      */
+/* -------------------------------------------------------------------------- */
 export async function parsePdf(file: File): Promise<string> {
   const arrayBuffer = await readFileAsArrayBuffer(file);
   const pdf: PDFDocumentProxy = await getDocument({ data: arrayBuffer }).promise;
