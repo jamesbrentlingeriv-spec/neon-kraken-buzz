@@ -141,7 +141,6 @@ allowBuilds:
   contentlayer: true
   contextify: true
   cordova.plugins.diagnostic: true
-  core-js: set this to true or false
   couchbase: true
   cpu-features: true
   cwebp-bin: true
@@ -161,14 +160,12 @@ allowBuilds:
   eccrypto: true
   egg-bin: true
   egg-ci: true
-  ejs: set this to true or false
   electron: true
   electron-chromedriver: true
   electron-prebuilt: true
   electron-winstaller: true
   elm: true
   elm-format: true
-  es5-ext: set this to true or false
   esbuild: true
   esoftplay: true
   event-loop-stats: true
